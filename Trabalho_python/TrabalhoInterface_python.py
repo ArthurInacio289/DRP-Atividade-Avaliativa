@@ -51,23 +51,31 @@ def cadastrar_aluno():
 
 def cadastrar_nota():
     def salvar_nota():
-        id_aluno = entry_id_aluno.get()
+        nome_aluno = entry_nome_aluno.get()
         nota = entry_nota.get()
-        if id_aluno and nota:
+        
+        if nome_aluno and nota:
             try:
                 nota_float = float(nota)
                 if 0 <= nota_float <= 10:
                     conn = conectar()
                     if conn is None:
                         return
+                    
                     with conn.cursor() as cursor:
-                        cursor.execute('INSERT INTO "notas" ("idaluno", "nota") VALUES (%s, %s)', (id_aluno, nota_float))
-                        conn.commit()
-                        messagebox.showinfo("Sucesso", f"Nota {nota_float} cadastrada com sucesso para o aluno de matrícula {id_aluno}!")
-                        entry_id_aluno.delete(0, tk.END)
-                        entry_nota.delete(0, tk.END)
-                else:
-                    messagebox.showwarning("Atenção", "A nota precisa ser entre 0 e 10.")
+                        cursor.execute('SELECT "id" FROM "alunos" WHERE "nome" = %s LIMIT 1', (nome_aluno,))
+                        aluno = cursor.fetchone()
+                        
+                        if aluno:
+                            id_aluno = aluno[0]
+                            cursor.execute('INSERT INTO "notas" ("idaluno", "nota") VALUES (%s, %s)', (id_aluno, nota_float))
+                            conn.commit()
+                            messagebox.showinfo("Sucesso", f"Nota {nota_float} cadastrada com sucesso para o aluno {nome_aluno}!")
+                            entry_nome_aluno.delete(0, tk.END)
+                            entry_nota.delete(0, tk.END)
+                        else:
+                            messagebox.showwarning("Atenção", "Aluno não encontrado. Verifique o nome e tente novamente.")
+            
             except ValueError:
                 messagebox.showwarning("Atenção", "Digite uma nota válida.")
             except Exception as e:
@@ -83,38 +91,43 @@ def cadastrar_nota():
     frame = tk.Frame(janela_nota, bg="#ffffff", padx=20, pady=20)
     frame.pack(expand=True)
 
-    tk.Label(frame, text="Matrícula do Aluno:", bg="#ffffff", font=("Arial", 12)).pack(pady=10)
-    entry_id_aluno = tk.Entry(frame, font=("Arial", 12), width=30)
-    entry_id_aluno.pack(pady=5)
+    tk.Label(frame, text="Nome do Aluno:", bg="#ffffff", font=("Arial", 12)).pack(pady=10)
+    entry_nome_aluno = tk.Entry(frame, font=("Arial", 12), width=30)
+    entry_nome_aluno.pack(pady=5)
+
     tk.Label(frame, text="Nota:", bg="#ffffff", font=("Arial", 12)).pack(pady=10)
     entry_nota = tk.Entry(frame, font=("Arial", 12), width=30)
     entry_nota.pack(pady=5)
+
     tk.Button(frame, text="Cadastrar Nota", command=salvar_nota, bg="#007bff", fg="white", font=("Arial", 12)).pack(pady=10)
 
 def consultar_notas():
     def buscar_notas():
-        id_aluno = entry_id_consulta.get()
-        if id_aluno:
+        pesquisa = entry_pesquisa.get()
+        if pesquisa:
             conn = conectar()
             if conn is None:
                 return
             try:
                 with conn.cursor() as cursor:
-                    cursor.execute('SELECT "nota" FROM "notas" WHERE "idaluno" = %s', (id_aluno,))
-                    notas = cursor.fetchall()
-                    cursor.execute('SELECT "nome" FROM "alunos" WHERE "id" = %s', (id_aluno,))
-                    nome_aluno = cursor.fetchone()
-                    if notas and nome_aluno:
-                        notas_str = ', '.join([str(n[0]) for n in notas])
-                        messagebox.showinfo("Notas", f"Notas do aluno {nome_aluno[0]}: {notas_str}")
+                    cursor.execute('SELECT "id", "nome" FROM "alunos" WHERE "nome" ILIKE %s', (f'%{pesquisa}%',))
+                    alunos = cursor.fetchall()
+                    if alunos:
+                        resultado = ""
+                        for aluno in alunos:
+                            cursor.execute('SELECT "nota" FROM "notas" WHERE "idaluno" = %s', (aluno[0],))
+                            notas = cursor.fetchall()
+                            notas_str = ', '.join([str(n[0]) for n in notas]) if notas else "Sem notas"
+                            resultado += f"{aluno[1]} (ID: {aluno[0]}): {notas_str}\n"
+                        messagebox.showinfo("Notas", resultado)
                     else:
-                        messagebox.showwarning("Atenção", "Nenhuma nota encontrada ou aluno não cadastrado.")
+                        messagebox.showwarning("Atenção", "Nenhum aluno encontrado com esse nome.")
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao consultar notas: {e}")
             finally:
                 conn.close()
         else:
-            messagebox.showwarning("Atenção", "Digite a matrícula do aluno.")
+            messagebox.showwarning("Atenção", "Digite o nome do aluno.")
 
     janela_consulta = tk.Toplevel()
     janela_consulta.title("Consulta de Notas")
@@ -124,9 +137,9 @@ def consultar_notas():
     frame = tk.Frame(janela_consulta, bg="#ffffff", padx=20, pady=20)
     frame.pack(expand=True)
 
-    tk.Label(frame, text="Matrícula do Aluno:", bg="#ffffff", font=("Arial", 12)).pack(pady=10)
-    entry_id_consulta = tk.Entry(frame, font=("Arial", 12), width=30)
-    entry_id_consulta.pack(pady=5)
+    tk.Label(frame, text="Nome do Aluno:", bg="#ffffff", font=("Arial", 12)).pack(pady=10)
+    entry_pesquisa = tk.Entry(frame, font=("Arial", 12), width=30)
+    entry_pesquisa.pack(pady=5)
     tk.Button(frame, text="Consultar", command=buscar_notas, bg="#007bff", fg="white", font=("Arial", 12)).pack(pady=10)
 
 janela = tk.Tk()
